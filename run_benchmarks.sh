@@ -143,15 +143,6 @@ check_dependencies() {
 
     if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"c++"* ]]; then
         check_command g++ "C++ benchmarks will be skipped"
-        
-        if check_command g++ &>/dev/null; then
-            # Check if boost is available, but don't fail if not
-            if check_command pkg-config &>/dev/null; then
-                if ! pkg-config --exists boost 2>/dev/null; then
-                    print_warning "C++ benchmarks may fail (Boost libraries not found)"
-                fi
-            fi
-        fi
     fi
 
     if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"java"* ]]; then

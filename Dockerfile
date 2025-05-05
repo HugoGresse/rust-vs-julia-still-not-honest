@@ -129,10 +129,10 @@ RUN node --version && \
     deno --version
 
 # Build all implementations
-RUN gcc -O3 -o fib_c fib.c && \
-    g++ -O3 -o fib_cpp fib.cpp && \
+RUN gcc -Ofast -o fib_c fib.c && \
+    g++ -Ofast -o fib_cpp fib.cpp && \
     go build -o fib_go fib.go && \
-    gfortran -O3 -o fib_fortran fib.f90 && \
+    gfortran -Ofast -o fib_fortran fib.f90 && \
     javac Fib.java && \
     zig build-exe -O ReleaseFast fib.zig && \
     cargo build --release && \
