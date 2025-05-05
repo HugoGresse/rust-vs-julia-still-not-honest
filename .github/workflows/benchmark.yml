@@ -38,48 +38,44 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-
-      - name: Set up Julia
-        uses: julia-actions/setup-julia@v1
-        with:
-          version: "1.9"
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: "1.21"
-
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: "temurin"
-          java-version: "17"
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-
-      - name: Set up C/C++ compiler
+      - name: Try patched Lima approach
+        id: lima
+        continue-on-error: true
         run: |
-          brew install gcc
+          # Install Docker and related tools
+          brew install docker docker-buildx colima lima
 
-      - name: Set up Fortran
-        run: |
-          brew install gfortran
+          # Get patched Lima binary that works without hardware virtualization
+          LIMA_PATH=$(brew --prefix)/bin/limactl
+          sudo curl -L -o $LIMA_PATH https://github.com/mikekazakov/lima-nohvf/raw/master/limactl
+          sudo chmod +x $LIMA_PATH
 
-      - name: Set up Zig
-        run: |
-          brew install zig
+          # Start Colima with QEMU emulation (no need for hardware virtualization)
+          colima start --arch arm64 --vm-type=qemu --network-address
 
-      - name: Run benchmarks
+          # Set up Docker BuildX
+          mkdir -p ~/.docker/cli-plugins
+          ln -sfn $(brew --prefix)/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
+
+          # Build Docker image and run benchmarks
+          docker build -t fib-benchmarks .
+          docker run --name fib-benchmark-container fib-benchmarks
+          docker cp fib-benchmark-container:/app/benchmark_results.csv .
+          docker cp fib-benchmark-container:/app/benchmark_table.md .
+
+          echo "LIMA_SUCCESS=true" >> $GITHUB_OUTPUT
+
+      - name: Fallback to native compilation
+        if: steps.lima.outcome != 'success' || steps.lima.outputs.LIMA_SUCCESS != 'true'
         run: |
-          chmod +x ./run_benchmarks.sh
-          ./run_benchmarks.sh
+          # Install necessary language compilers and interpreters
+          brew install go rust julia python gcc node openjdk@17
+
+          # Make sure Java is properly set up
+          echo "JAVA_HOME=$(/usr/libexec/java_home -v 17)" >> $GITHUB_ENV
+
+          # Run benchmarks natively
+          ./run_benchmarks.sh --no-docker --runs 3
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
