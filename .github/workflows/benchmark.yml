@@ -41,7 +41,7 @@ jobs:
       - name: Set up Colima and Docker
         run: |
           brew install colima docker docker-buildx
-          colima start --arch aarch64 --memory 4 --cpu 4 --vm-type=vz --mount-type=virtiofs
+          colima start --arch aarch64 --memory 4 --cpu 4
           mkdir -p ~/.docker/cli-plugins
           ln -sfn $(brew --prefix)/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
 
