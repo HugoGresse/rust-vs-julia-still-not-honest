@@ -38,14 +38,26 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Docker
+      - name: Set up Colima and Docker
         run: |
-          brew install docker
-          colima start --arch aarch64 --memory 4 --cpu 4
+          brew install colima docker docker-buildx
+          colima start --arch aarch64 --memory 4 --cpu 4 --vm-type=vz --mount-type=virtiofs
+          mkdir -p ~/.docker/cli-plugins
+          ln -sfn $(brew --prefix)/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          driver-opts: network=host
 
       - name: Build Docker image
-        run: |
-          docker build -t fib-benchmarks .
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: fib-benchmarks:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run benchmarks in Docker
         run: |
