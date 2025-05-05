@@ -1,12 +1,12 @@
 const std = @import("std");
 
-fn fib(n: u32) u64 {
+fn fib(n: u32) u128 {
     if (n == 1 or n == 2) {
         return 1;
     }
     
-    var a: u64 = 1;
-    var b: u64 = 1;
+    var a: u128 = 1;
+    var b: u128 = 1;
     
     var i: u32 = 3;
     while (i <= n) : (i += 1) {

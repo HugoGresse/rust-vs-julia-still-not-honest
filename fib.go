@@ -1,16 +1,23 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"math/big"
+)
 
-func fib(n uint) uint64 {
+func fib(n uint) *big.Int {
 	if n == 1 || n == 2 {
-		return 1
+		return big.NewInt(1)
 	}
 
-	var a, b uint64 = 1, 1
-
+	a := big.NewInt(1)
+	b := big.NewInt(1)
+	
 	for i := uint(3); i <= n; i++ {
-		a, b = b, a+b
+		// Create temporary value for a+b
+		next := new(big.Int).Add(a, b)
+		a = b
+		b = next
 	}
 
 	return b

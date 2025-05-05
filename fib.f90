@@ -1,8 +1,8 @@
 program fibonacci
     implicit none
-    integer, parameter :: int64 = selected_int_kind(18)
+    integer, parameter :: int128 = selected_int_kind(38)
     integer :: i
-    integer(kind=int64) :: a, b, next, val
+    integer(kind=int128) :: a, b, next, val
     
     val = fib(60)
     print *, val
@@ -10,8 +10,8 @@ program fibonacci
 contains
     function fib(n) result(res)
         integer, intent(in) :: n
-        integer(kind=int64) :: res
-        integer(kind=int64) :: a, b, next
+        integer(kind=int128) :: res
+        integer(kind=int128) :: a, b, next
         integer :: i
         
         if (n == 1 .or. n == 2) then

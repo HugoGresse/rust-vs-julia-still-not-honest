@@ -1,15 +1,19 @@
 #include <stdio.h>
+#include <inttypes.h>
+#include <stdint.h>
 
-unsigned long long fib(unsigned int n) {
+// Simple Fibonacci implementation using uint64_t
+// Note: This will overflow for n > 93
+uint64_t fib(unsigned int n) {
     if (n == 1 || n == 2) {
         return 1;
     }
     
-    unsigned long long a = 1;
-    unsigned long long b = 1;
+    uint64_t a = 1;
+    uint64_t b = 1;
     
     for (unsigned int i = 3; i <= n; i++) {
-        unsigned long long next = a + b;
+        uint64_t next = a + b;
         a = b;
         b = next;
     }
@@ -18,7 +22,7 @@ unsigned long long fib(unsigned int n) {
 }
 
 int main() {
-    unsigned long long val = fib(60);
-    printf("%llu\n", val);
+    uint64_t val = fib(60);
+    printf("%" PRIu64 "\n", val);
     return 0;
 } 
