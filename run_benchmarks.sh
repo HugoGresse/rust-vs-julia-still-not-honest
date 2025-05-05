@@ -158,6 +158,19 @@ check_dependencies() {
         check_command javac "Java benchmarks will be skipped"
     fi
     
+    if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"javascript"* || "$SELECTED_LANGS" == *"js"* ]]; then
+        check_command node "Node.js benchmarks will be skipped"
+        check_command bun "Bun benchmarks will be skipped"
+        check_command deno "Deno benchmarks will be skipped"
+    fi
+    
+    if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"typescript"* || "$SELECTED_LANGS" == *"ts"* ]]; then
+        check_command node "Node.js benchmarks will be skipped"
+        check_command ts-node "TypeScript benchmarks with Node.js will be skipped"
+        check_command bun "Bun benchmarks will be skipped"
+        check_command deno "Deno benchmarks will be skipped"
+    fi
+    
     echo
 }
 
@@ -454,8 +467,15 @@ declare -A languages=(
 # Define additional languages that might be available
 declare -A additional_languages=(
     ["WebAssembly"]="node fib.wasm.js"
-    ["JavaScript"]="node fib.js"
-    ["TypeScript"]="ts-node fib.ts"
+    ["JavaScript-Node"]="node fib.node.js"
+    ["JavaScript-Bun"]="bun fib.js"
+    ["JavaScript-Deno"]="deno run --allow-read fib.js.deno"
+    ["TypeScript-Node"]="ts-node fib.node.ts"
+    ["TypeScript-Node-Compiled"]="node fib.node_alt.js"
+    ["TypeScript-Node-Simple"]="ts-node fib.node.simple.ts"
+    ["TypeScript-Bun"]="bun fib.ts"
+    ["TypeScript-Deno"]="deno run --allow-read fib.ts.deno"
+    ["TypeScript-Deno-Simple"]="deno run fib.ts.deno.simple.ts"
     ["Ruby"]="ruby fib.rb"
     ["PHP"]="php fib.php"
 )
@@ -484,19 +504,81 @@ done
 # Try additional languages if files exist and not filtered out
 for lang in "${!additional_languages[@]}"; do
     lang_lower=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
+    base_lang=$(echo "$lang_lower" | cut -d'-' -f1)
     
     # Skip if not in selected languages (if specified)
-    if [[ -n "$SELECTED_LANGS" && ! "$SELECTED_LANGS" == *"$lang_lower"* ]]; then
+    if [[ -n "$SELECTED_LANGS" && ! "$SELECTED_LANGS" == *"$base_lang"* && ! "$SELECTED_LANGS" == *"$lang_lower"* ]]; then
         continue
     fi
     
-    # Check if source file exists
-    source_file=$(echo "${additional_languages[$lang]}" | awk '{print $NF}')
+    # Extract runtime and file from command
+    cmd="${additional_languages[$lang]}"
+    print_info "Examining command for $lang: $cmd"
+    runtime=$(echo "$cmd" | awk '{print $1}')
+    
+    # Special handling for deno commands
+    if [[ "$runtime" == "deno" ]]; then
+        # For deno, we need to find the actual source file after the 'run' and potential flags
+        source_file=$(echo "$cmd" | awk '{for(i=1;i<=NF;i++) if($i == "run") {for(j=i+1;j<=NF;j++) if($j !~ /^--/) {print $j; exit}}}')
+        print_info "Deno source file: $source_file"
+    else
+        # For other runtimes, the source file is typically the second argument
+        source_file=$(echo "$cmd" | awk '{for(i=2;i<=NF;i++) if($i !~ /^-/) {print $i; exit}}')
+        print_info "Standard source file: $source_file"
+    fi
+    
+    # Special handling for ts-node
+    if [[ "$runtime" == "npx" && $(echo "$cmd" | grep -q "ts-node"; echo $?) -eq 0 ]]; then
+        # For ts-node via npx, just check if the .ts file exists
+        print_info "Detected ts-node via npx"
+        runtime_check=true
+        ts_file=$(echo "$cmd" | awk '{for(i=3;i<=NF;i++) if($i !~ /^-/) {print $i; exit}}')
+        print_info "TypeScript file for ts-node: $ts_file"
+        if [[ -f "$ts_file" ]]; then
+            source_file="$ts_file"
+        else
+            source_file=""
+            print_warning "TypeScript file not found: $ts_file"
+        fi
+    else
+        # Check if runtime exists
+        runtime_check=$(command -v "$runtime" &>/dev/null && echo true || echo false)
+        if [[ "$runtime_check" != "true" ]]; then
+            print_warning "Runtime '$runtime' not found in PATH"
+            which "$runtime" || echo "which command failed for $runtime"
+        fi
+    fi
+    
+    # Display additional debug info
     if [[ -f "$source_file" ]]; then
+        print_info "Source file exists: $source_file ($(wc -l < "$source_file") lines)"
+        if [[ "$VERBOSE" == "true" ]]; then
+            print_info "First few lines of $source_file:"
+            head -n 5 "$source_file"
+        fi
+    else
+        print_warning "Source file does not exist: $source_file"
+        ls -la $(dirname "$source_file" 2>/dev/null)/ || echo "Cannot list directory contents"
+    fi
+    
+    # Check if runtime exists and source file exists
+    if [[ "$runtime_check" == "true" && -f "$source_file" ]]; then
         if [[ "$VERBOSE" == "true" ]]; then
             print_info "Found additional language: $lang"
         fi
+        # Try with smaller input for diagnostics first
+        if [[ "$lang" == *"JavaScript"* || "$lang" == *"TypeScript"* ]]; then
+            print_info "Testing $lang with smaller input first..."
+            modified_cmd="${cmd} 10"
+            $modified_cmd &>/dev/null && print_success "  Test with small input successful" || print_warning "  Test with small input failed"
+        fi
         run_benchmark "$lang" "${additional_languages[$lang]}" "$RUNS" || true
+    elif [[ "$VERBOSE" == "true" ]]; then
+        if [[ "$runtime_check" != "true" ]]; then
+            print_info "Skipping $lang (runtime '$runtime' not available)"
+        elif [[ ! -f "$source_file" ]]; then
+            print_info "Skipping $lang (source file '$source_file' not found)"
+        fi
     fi
 done
 

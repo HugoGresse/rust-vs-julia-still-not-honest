@@ -27,6 +27,8 @@ RUN apt-get update && apt-get install -y \
     apt-transport-https \
     ca-certificates \
     software-properties-common \
+    unzip \
+    ruby \
     && rm -rf /var/lib/apt/lists/*
 
 # Create symlink for dynamic loader (helps with OrbStack compatibility)
@@ -48,11 +50,82 @@ RUN mkdir -p /opt/zig && \
     rm /tmp/zig.tar.xz && \
     ln -s /opt/zig/zig /usr/local/bin/zig
 
+# Install Node.js with LTS version for better stability
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get update && \
+    apt-get install -y nodejs && \
+    # Verify Node installation
+    node --version && \
+    npm --version
+
+# Install TypeScript and ts-node with specific versions for compatibility
+RUN npm install -g typescript@4.9.5 ts-node@10.9.1 @types/node && \
+    npm list -g --depth=0 && \
+    # Create symlinks to ensure ts-node is in path
+    ln -sf /usr/lib/node_modules/ts-node/dist/bin.js /usr/local/bin/ts-node && \
+    # Verify TypeScript installations
+    echo "Node.js version: $(node -v)" && \
+    echo "TypeScript version: $(npx tsc -v)" && \
+    echo "ts-node version: $(ts-node -v)"
+
+# Set NODE_PATH for global modules
+ENV NODE_PATH="/usr/lib/node_modules"
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+RUN echo "Bun version: $(bun -v)"
+
+# Install Deno
+RUN curl -fsSL https://deno.land/install.sh | sh
+ENV DENO_INSTALL="/root/.deno"
+ENV PATH="${DENO_INSTALL}/bin:${PATH}"
+# Create deno config to allow all permissions by default in the container
+RUN mkdir -p /root/.deno/config && \
+    echo '{ "permissions": { "read": true, "write": true, "net": true, "env": true, "run": true, "ffi": true, "hrtime": true } }' > /root/.deno/config/deno.json
+RUN echo "Deno version: $(deno --version)"
+
 # Create working directory
 WORKDIR /app
 
 # Copy source files
 COPY . .
+
+# Fix JavaScript file extensions (critical for Node.js to work properly)
+RUN if [ -f "fib.js.node" ]; then cp fib.js.node fib.node.js; fi && \
+    if [ -f "fib.ts.node" ]; then cp fib.ts.node fib.node.ts; fi
+
+# Make scripts executable
+RUN chmod +x run_benchmarks.sh prepare_js_benchmarks.sh test_js_env.sh compile_ts.sh
+# Ensure JavaScript and TypeScript files have proper permissions
+RUN chmod +x fib.js* fib.ts* fib.node.js fib.node.ts
+
+# Prepare JavaScript and TypeScript files
+RUN ./prepare_js_benchmarks.sh
+
+# Compile TypeScript files to JavaScript as fallback
+RUN ./compile_ts.sh
+
+# Create simple test files to verify JavaScript environment
+RUN echo 'console.log("Simple JS test")' > test.js && \
+    echo 'console.log("Simple TS test")' > test.ts && \
+    chmod +x test.js test.ts
+
+# Test basic Node.js and TypeScript functionality
+RUN node -e "console.log('Node.js basic test: SUCCESS')" && \
+    node --version && \
+    ts-node -e "const x: number = 42; console.log('TypeScript basic test: ' + x);" || echo "Basic ts-node test failed"
+
+# Test JavaScript/TypeScript environments
+RUN ./test_js_env.sh
+
+# Verify JS/TS environment
+RUN node --version && \
+    which node && \
+    which ts-node && \
+    ts-node --version && \
+    deno --version
 
 # Build all implementations
 RUN gcc -O3 -o fib_c fib.c && \
