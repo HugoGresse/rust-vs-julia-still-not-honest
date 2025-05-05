@@ -171,6 +171,18 @@ check_dependencies() {
         check_command deno "Deno benchmarks will be skipped"
     fi
     
+    if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"php"* ]]; then
+        check_command php "PHP benchmarks will be skipped"
+    fi
+    
+    if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"lisp"* ]]; then
+        check_command sbcl "Common Lisp benchmarks will be skipped"
+    fi
+    
+    if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"perl"* ]]; then
+        check_command perl "Perl benchmarks will be skipped"
+    fi
+    
     echo
 }
 
@@ -472,12 +484,12 @@ declare -A additional_languages=(
     ["JavaScript-Deno"]="deno run --allow-read fib.js.deno"
     ["TypeScript-Node"]="ts-node fib.node.ts"
     ["TypeScript-Node-Compiled"]="node fib.node_alt.js"
-    ["TypeScript-Node-Simple"]="ts-node fib.node.simple.ts"
     ["TypeScript-Bun"]="bun fib.ts"
     ["TypeScript-Deno"]="deno run --allow-read fib.ts.deno"
-    ["TypeScript-Deno-Simple"]="deno run fib.ts.deno.simple.ts"
     ["Ruby"]="ruby fib.rb"
     ["PHP"]="php fib.php"
+    ["Perl"]="perl fib.pl"
+    ["Lisp"]="sbcl --script fib.lisp"
 )
 
 # Validate language implementations

@@ -22,5 +22,8 @@ function fib(n::Int)
     end
 end
 
+# Precompile for common sizes
+precompile(fib, (Int,))
+
 val = fib(60)
 println(val)

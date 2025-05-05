@@ -29,6 +29,9 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     unzip \
     ruby \
+    php \
+    sbcl \
+    perl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create symlink for dynamic loader (helps with OrbStack compatibility)
@@ -97,7 +100,7 @@ RUN if [ -f "fib.js.node" ]; then cp fib.js.node fib.node.js; fi && \
     if [ -f "fib.ts.node" ]; then cp fib.ts.node fib.node.ts; fi
 
 # Make scripts executable
-RUN chmod +x run_benchmarks.sh prepare_js_benchmarks.sh test_js_env.sh compile_ts.sh
+RUN chmod +x run_benchmarks.sh prepare_js_benchmarks.sh compile_ts.sh
 # Ensure JavaScript and TypeScript files have proper permissions
 RUN chmod +x fib.js* fib.ts* fib.node.js fib.node.ts
 
@@ -117,8 +120,6 @@ RUN node -e "console.log('Node.js basic test: SUCCESS')" && \
     node --version && \
     ts-node -e "const x: number = 42; console.log('TypeScript basic test: ' + x);" || echo "Basic ts-node test failed"
 
-# Test JavaScript/TypeScript environments
-RUN ./test_js_env.sh
 
 # Verify JS/TS environment
 RUN node --version && \
@@ -134,7 +135,8 @@ RUN gcc -O3 -o fib_c fib.c && \
     gfortran -O3 -o fib_fortran fib.f90 && \
     javac Fib.java && \
     zig build-exe -O ReleaseFast fib.zig && \
-    cargo build --release
+    cargo build --release && \
+    chmod +x fib.php fib.pl
 
 # Create an entrypoint that runs the benchmarks
 ENTRYPOINT ["/app/run_benchmarks.sh"] 
