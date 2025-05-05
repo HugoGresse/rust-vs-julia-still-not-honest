@@ -10,5 +10,16 @@ def fib(n: int) -> int:
     return b
 
 if __name__ == "__main__":
-    val = fib(60)
-    print(val)
+    import sys
+    
+    # Parse command line arguments
+    n = int(sys.argv[1]) if len(sys.argv) > 1 else 60
+    runs = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+    
+    # Internal benchmarking loop
+    result = None
+    for _ in range(runs):
+        result = fib(n)
+    
+    # Only print the result once
+    print(result)

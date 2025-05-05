@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"os"
+	"strconv"
 )
 
 func fib(n uint) *big.Int {
@@ -24,6 +26,28 @@ func fib(n uint) *big.Int {
 }
 
 func main() {
-	val := fib(60)
-	fmt.Println(val)
+	// Parse command line arguments
+	n := uint(60)
+	runs := uint(1)
+	
+	if len(os.Args) > 1 {
+		if val, err := strconv.ParseUint(os.Args[1], 10, 64); err == nil {
+			n = uint(val)
+		}
+	}
+	
+	if len(os.Args) > 2 {
+		if val, err := strconv.ParseUint(os.Args[2], 10, 64); err == nil {
+			runs = uint(val)
+		}
+	}
+	
+	// Internal benchmarking loop
+	var result *big.Int
+	for i := uint(0); i < runs; i++ {
+		result = fib(n)
+	}
+	
+	// Print the result
+	fmt.Println(result)
 } 

@@ -314,8 +314,12 @@ run_benchmark() {
     
     print_info "Running $name benchmark ($runs runs)..."
     
+    # Add parameters for n and runs to the command
+    # The pattern is: command n runs
+    local full_command="$command $FIB_N $runs"
+    
     # Validate command can run
-    if ! $command &>/dev/null; then
+    if ! $full_command &>/dev/null; then
         print_error "Skipping $name benchmark - command failed to run"
         echo "$name,FAILED" >> "$RESULT_FILE"
         return 1
@@ -323,7 +327,7 @@ run_benchmark() {
     
     # Test the output once to ensure it matches expected result
     local valid_output=$(mktemp)
-    $command > "$valid_output"
+    $command $FIB_N 1 > "$valid_output"
     local result=$(cat "$valid_output")
     rm "$valid_output"
     
@@ -331,61 +335,17 @@ run_benchmark() {
         print_warning "  Output '$result' does not match expected '$EXPECTED_RESULT'"
     fi
     
-    # Array to store all run times for statistical analysis
-    local times=()
-    local total_time=0
-    local min_time=9999999
-    local max_time=0
-    
-    for i in $(seq 1 "$runs"); do
-        if [[ "$SHOW_PROGRESS" == "true" ]]; then
-            echo -ne "\r  Running: [$(printf '=%.0s' $(seq 1 "$i"))$(printf ' %.0s' $(seq "$i" $(($runs - 1))))] ($i/$runs)"
-        fi
-        
-        # Time the command using bash's built-in timing, sending output to /dev/null
-        # to avoid output parsing issues
-        local start_time=$(date +%s.%N)
-        $command > /dev/null
-        local end_time=$(date +%s.%N)
-        local time_taken=$(echo "$end_time - $start_time" | bc)
-        
-        times+=("$time_taken")
-        total_time=$(echo "$total_time + $time_taken" | bc)
-        
-        # Update min/max
-        if (( $(echo "$time_taken < $min_time" | bc -l) )); then
-            min_time=$time_taken
-        fi
-        
-        if (( $(echo "$time_taken > $max_time" | bc -l) )); then
-            max_time=$time_taken
-        fi
-    done
-    
-    if [[ "$SHOW_PROGRESS" == "true" ]]; then
-        echo -ne "\r                                                                 \r"
-    fi
-    
-    # Calculate statistics
-    local avg_time=$(echo "scale=6; $total_time / $runs" | bc)
-    
-    # Calculate standard deviation
-    local variance=0
-    for t in "${times[@]}"; do
-        local diff=$(echo "$t - $avg_time" | bc)
-        variance=$(echo "$variance + ($diff * $diff)" | bc)
-    done
-    local stddev=$(echo "scale=6; sqrt($variance / $runs)" | bc)
+    # For the internal benchmark, we only need to run it once as the loop is inside the implementation
+    local start_time=$(date +%s.%N)
+    $full_command > /dev/null
+    local end_time=$(date +%s.%N)
+    local time_taken=$(echo "$end_time - $start_time" | bc)
     
     # Print results
-    print_success "  Average: ${BOLD}${avg_time}s${RESET} (Min: ${min_time}s, Max: ${max_time}s, StdDev: ${stddev}s)"
+    print_success "  Time: ${BOLD}${time_taken}s${RESET}"
     
-    # Save to CSV
-    echo "$name,$avg_time,$min_time,$max_time,$stddev" >> "$RESULT_FILE"
-    
-    if [[ "$VERBOSE" == "true" ]]; then
-        echo "  All runs: ${times[*]}"
-    fi
+    # Save to CSV (using the same metrics for compatibility)
+    echo "$name,$time_taken,$time_taken,$time_taken,0" >> "$RESULT_FILE"
     
     echo
 }

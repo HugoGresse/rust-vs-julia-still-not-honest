@@ -16,6 +16,18 @@ fn fib(n: u32) -> u64 {
 }
 
 fn main() {
-    let val = fib(60);
-    println!("{}", val);
+    // Parse command line arguments
+    let args: Vec<String> = std::env::args().collect();
+    
+    let n: u32 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(60);
+    let runs: u32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(1);
+    
+    // Internal benchmarking loop
+    let mut result = 0;
+    for _ in 0..runs {
+        result = fib(n);
+    }
+    
+    // Only print the result once
+    println!("{}", result);
 } 

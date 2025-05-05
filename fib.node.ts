@@ -16,10 +16,16 @@ export function fibonacci(n: number): number {
 
 // Execute only if this file is being run directly (not imported)
 if (require.main === module) {
-  // Get command line argument or use default
+  // Parse command line arguments
   const n: number = process.argv.length > 2 ? parseInt(process.argv[2]) : 60;
+  const runs: number = process.argv.length > 3 ? parseInt(process.argv[3]) : 1;
 
-  // Calculate and output result
-  const result: number = fibonacci(n);
+  // Internal benchmarking loop
+  let result: number = 0;
+  for (let i = 0; i < runs; i++) {
+    result = fibonacci(n);
+  }
+
+  // Output result
   console.log(result);
 }

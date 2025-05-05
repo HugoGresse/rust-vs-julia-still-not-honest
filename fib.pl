@@ -22,5 +22,15 @@ sub fib {
     return $b;
 }
 
-my $val = fib(60);
-print "$val\n"; 
+# Parse command line arguments
+my $n = $ARGV[0] || 60;
+my $runs = $ARGV[1] || 1;
+
+# Internal benchmarking loop
+my $result;
+for (my $i = 0; $i < $runs; $i++) {
+    $result = fib($n);
+}
+
+# Output result
+print "$result\n"; 

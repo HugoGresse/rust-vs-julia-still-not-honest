@@ -25,5 +25,15 @@ end
 # Precompile for common sizes
 precompile(fib, (Int,))
 
-val = fib(60)
-println(val)
+# Parse command line arguments
+n = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 60
+runs = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 1
+
+# Internal benchmarking loop
+result = fib(n)
+for _ in 2:runs
+    result = fib(n)
+end
+
+# Only print the result once
+println(result)

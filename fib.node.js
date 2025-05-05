@@ -14,8 +14,15 @@ function fibonacci(n) {
   return b;
 }
 
-// Default to 45 as in other implementations
+// Parse command line arguments
 const n = process.argv.length > 2 ? parseInt(process.argv[2]) : 60;
+const runs = process.argv.length > 3 ? parseInt(process.argv[3]) : 1;
 
-// Calculate and output
-console.log(fibonacci(n));
+// Internal benchmarking loop
+let result;
+for (let i = 0; i < runs; i++) {
+  result = fibonacci(n);
+}
+
+// Output result
+console.log(result);
