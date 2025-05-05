@@ -37,9 +37,9 @@ RUN mkdir -p /lib64 && \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install Julia using the official apt repository
-RUN wget -qO- https://julialang-s3.julialang.org/bin/linux/x64/1.9/julia-1.9.3-linux-x86_64.tar.gz | \
-    tar -xz -C /usr/local --strip-components=1
+# Install Julia using the official installation script
+RUN curl -fsSL https://install.julialang.org | sh -s -- -y
+ENV PATH="/root/.juliaup/bin:${PATH}"
 
 # Install Zig - fixed installation
 RUN mkdir -p /opt/zig && \
@@ -53,9 +53,6 @@ WORKDIR /app
 
 # Copy source files
 COPY . .
-
-# Modified run_benchmarks.sh to handle Julia failure gracefully
-RUN sed -i 's/run_benchmark "Julia" "julia fib.jl"/echo "Skipping Julia benchmark due to compatibility issues"/' run_benchmarks.sh || true
 
 # Build all implementations
 RUN gcc -O3 -o fib_c fib.c && \
