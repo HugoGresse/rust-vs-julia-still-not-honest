@@ -22,7 +22,16 @@ uint64_t fib(unsigned int n) {
 }
 
 int main() {
+    // Calculate the 60th Fibonacci number
     uint64_t val = fib(60);
+    
+    // Redirect stderr to /dev/null to prevent interference with benchmark's time output
+    freopen("/dev/null", "w", stderr);
+    
+    // Print only the number with no extra text or newlines, as the benchmark expects
     printf("%" PRIu64 "\n", val);
+    
+    // Ensure output is flushed
+    fflush(stdout);
     return 0;
 } 

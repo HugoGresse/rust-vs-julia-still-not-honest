@@ -294,29 +294,33 @@ run_benchmark() {
         return 1
     fi
     
+    # Test the output once to ensure it matches expected result
+    local valid_output=$(mktemp)
+    $command > "$valid_output"
+    local result=$(cat "$valid_output")
+    rm "$valid_output"
+    
+    if [[ "$result" != "$EXPECTED_RESULT" ]]; then
+        print_warning "  Output '$result' does not match expected '$EXPECTED_RESULT'"
+    fi
+    
     # Array to store all run times for statistical analysis
     local times=()
     local total_time=0
     local min_time=9999999
     local max_time=0
-    local test_result=""
     
     for i in $(seq 1 "$runs"); do
         if [[ "$SHOW_PROGRESS" == "true" ]]; then
             echo -ne "\r  Running: [$(printf '=%.0s' $(seq 1 "$i"))$(printf ' %.0s' $(seq "$i" $(($runs - 1))))] ($i/$runs)"
         fi
         
-        # Use /usr/bin/time with format to get real time in seconds
-        time_output=$(/usr/bin/time -f "%e" $command 2>&1)
-        test_result=$(echo "$time_output" | grep -v "^[0-9]")
-        time_taken=$(echo "$time_output" | grep "^[0-9]" | tail -n 1)
-        
-        # Validate result is correct
-        if [[ "$test_result" != "$EXPECTED_RESULT" ]]; then
-            if [[ "$VERBOSE" == "true" ]]; then
-                print_warning "  Unexpected output: $test_result (expected: $EXPECTED_RESULT)"
-            fi
-        fi
+        # Time the command using bash's built-in timing, sending output to /dev/null
+        # to avoid output parsing issues
+        local start_time=$(date +%s.%N)
+        $command > /dev/null
+        local end_time=$(date +%s.%N)
+        local time_taken=$(echo "$end_time - $start_time" | bc)
         
         times+=("$time_taken")
         total_time=$(echo "$total_time + $time_taken" | bc)

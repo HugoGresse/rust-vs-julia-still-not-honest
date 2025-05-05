@@ -5,7 +5,7 @@ program fibonacci
     integer(kind=int128) :: a, b, next, val
     
     val = fib(60)
-    print *, val
+    write(*, '(I0)') val
     
 contains
     function fib(n) result(res)
