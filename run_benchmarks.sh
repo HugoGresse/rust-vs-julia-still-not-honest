@@ -561,17 +561,6 @@ for lang in "${!additional_languages[@]}"; do
         fi
     fi
     
-    # Display additional debug info
-    if [[ -f "$source_file" ]]; then
-        print_info "Source file exists: $source_file ($(wc -l < "$source_file") lines)"
-        if [[ "$VERBOSE" == "true" ]]; then
-            print_info "First few lines of $source_file:"
-            head -n 5 "$source_file"
-        fi
-    else
-        print_warning "Source file does not exist: $source_file"
-    fi
-    
     # Check if runtime exists and source file exists
     if [[ "$runtime_check" == "true" && -f "$source_file" ]]; then
         if [[ "$VERBOSE" == "true" ]]; then

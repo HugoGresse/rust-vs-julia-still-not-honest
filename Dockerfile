@@ -48,7 +48,7 @@ ENV PATH="/root/.juliaup/bin:${PATH}"
 
 # Install Zig - fixed installation
 RUN mkdir -p /opt/zig && \
-    wget -O /tmp/zig.tar.xz https://ziglang.org/download/0.11.0/zig-linux-x86_64-0.11.0.tar.xz && \
+    wget -O /tmp/zig.tar.xz https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz && \
     tar -xf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 && \
     rm /tmp/zig.tar.xz && \
     ln -s /opt/zig/zig /usr/local/bin/zig
