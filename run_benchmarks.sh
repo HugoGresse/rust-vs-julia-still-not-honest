@@ -558,7 +558,6 @@ for lang in "${!additional_languages[@]}"; do
         fi
     else
         print_warning "Source file does not exist: $source_file"
-        ls -la $(dirname "$source_file" 2>/dev/null)/ || echo "Cannot list directory contents"
     fi
     
     # Check if runtime exists and source file exists

@@ -51,7 +51,7 @@ RUN mkdir -p /opt/zig && \
     ln -s /opt/zig/zig /usr/local/bin/zig
 
 # Install Node.js with LTS version for better stability
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get update && \
     apt-get install -y nodejs && \
     # Verify Node installation
