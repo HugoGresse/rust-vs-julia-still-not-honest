@@ -234,13 +234,64 @@ compile_languages() {
     echo
 }
 
-# Validate language implementations return correct result
+# Prepare language definitions
+# Using a more compatible approach for macOS
+setup_languages() {
+    # Reset arrays
+    unset langs_names lang_cmds
+    
+    # Define languages and commands
+    langs_names=(
+        "Rust"
+        "Julia"
+        "Python"
+        "C"
+        "C++"
+        "Go"
+        "Fortran"
+        "Java"
+        "Zig"
+    )
+    
+    lang_cmds=(
+        "./target/release/fib"
+        "julia fib.jl"
+        "python3 fib.py"
+        "./fib_c"
+        "./fib_cpp"
+        "./fib_go"
+        "./fib_fortran"
+        "java Fib"
+        "./fib"
+    )
+    
+    # Setup additional languages that might be available
+    additional_langs_names=(
+        "WebAssembly"
+        "JavaScript"
+        "TypeScript"
+        "Ruby"
+        "PHP"
+    )
+    
+    additional_lang_cmds=(
+        "node fib.wasm.js"
+        "node fib.js"
+        "ts-node fib.ts"
+        "ruby fib.rb"
+        "php fib.php"
+    )
+}
+
+
+# Run benchmarks using parallel arrays instead of associative arrays
 validate_languages() {
     print_info "Validating language implementations..."
     
-    local validated_languages=()
+    local validated_indices=()
     
-    for lang in "${!languages[@]}"; do
+    for i in "${!langs_names[@]}"; do
+        lang="${langs_names[$i]}"
         lang_lower=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
         
         # Skip if not in selected languages (if specified)
@@ -250,7 +301,7 @@ validate_languages() {
         
         print_info "  Validating $lang..."
         
-        cmd=${languages[$lang]}
+        cmd="${lang_cmds[$i]}"
         result=$($cmd 2>/dev/null || echo "FAILED")
         
         if [[ "$result" == "FAILED" ]]; then
@@ -259,21 +310,26 @@ validate_languages() {
             print_warning "    $lang returned incorrect result: '$result' (expected: '$EXPECTED_RESULT')"
         else
             print_success "    $lang result verified: '$result'"
-            validated_languages+=("$lang")
+            validated_indices+=("$i")
         fi
     done
     
-    # Update the languages array to only include validated languages
-    for lang in "${!languages[@]}"; do
-        if ! printf '%s\n' "${validated_languages[@]}" | grep -q "^$lang$"; then
-            unset languages["$lang"]
-        fi
+    # Filter arrays to only include validated languages
+    local temp_names=()
+    local temp_cmds=()
+    
+    for i in "${validated_indices[@]}"; do
+        temp_names+=("${langs_names[$i]}")
+        temp_cmds+=("${lang_cmds[$i]}")
     done
     
-    if [[ "${#languages[@]}" -eq 0 ]]; then
+    langs_names=("${temp_names[@]}")
+    lang_cmds=("${temp_cmds[@]}")
+    
+    if [[ "${#langs_names[@]}" -eq 0 ]]; then
         print_warning "No language implementations were successfully validated. Check that implementations are correct."
     else
-        print_success "Successfully validated ${#languages[@]} language implementations."
+        print_success "Successfully validated ${#langs_names[@]} language implementations."
     fi
     
     echo
@@ -363,6 +419,12 @@ run_benchmark() {
     echo
 }
 
+# Call setup function
+setup_languages
+
+# Validate language implementations
+validate_languages
+
 # -------------------------
 # Parse command line args
 # -------------------------
@@ -432,36 +494,12 @@ compile_languages
 # Create results file with detailed header
 echo "Language,Average(s),Min(s),Max(s),StdDev(s)" > "$RESULT_FILE"
 
-# Prepare language definitions
-declare -A languages=(
-    ["Rust"]="./target/release/fib"
-    ["Julia"]="julia fib.jl"
-    ["Python"]="python3 fib.py"
-    ["C"]="./fib_c"
-    ["C++"]="./fib_cpp"
-    ["Go"]="./fib_go"
-    ["Fortran"]="./fib_fortran"
-    ["Java"]="java Fib"
-    ["Zig"]="./fib"
-)
-
-# Define additional languages that might be available
-declare -A additional_languages=(
-    ["WebAssembly"]="node fib.wasm.js"
-    ["JavaScript"]="node fib.js"
-    ["TypeScript"]="ts-node fib.ts"
-    ["Ruby"]="ruby fib.rb"
-    ["PHP"]="php fib.php"
-)
-
-# Validate language implementations
-validate_languages
-
 # Run benchmarks
 print_header "Running Benchmarks" "-----------------"
 
 # First run primary languages
-for lang in "${!languages[@]}"; do
+for i in "${!langs_names[@]}"; do
+    lang="${langs_names[$i]}"
     lang_lower=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
     
     # Skip if not in selected languages (if specified)
@@ -472,11 +510,12 @@ for lang in "${!languages[@]}"; do
         continue
     fi
     
-    run_benchmark "$lang" "${languages[$lang]}" "$RUNS" || true
+    run_benchmark "$lang" "${lang_cmds[$i]}" "$RUNS" || true
 done
 
 # Try additional languages if files exist and not filtered out
-for lang in "${!additional_languages[@]}"; do
+for i in "${!additional_langs_names[@]}"; do
+    lang="${additional_langs_names[$i]}"
     lang_lower=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
     
     # Skip if not in selected languages (if specified)
@@ -485,12 +524,13 @@ for lang in "${!additional_languages[@]}"; do
     fi
     
     # Check if source file exists
-    source_file=$(echo "${additional_languages[$lang]}" | awk '{print $NF}')
+    cmd="${additional_lang_cmds[$i]}"
+    source_file=$(echo "$cmd" | awk '{print $NF}')
     if [[ -f "$source_file" ]]; then
         if [[ "$VERBOSE" == "true" ]]; then
             print_info "Found additional language: $lang"
         fi
-        run_benchmark "$lang" "${additional_languages[$lang]}" "$RUNS" || true
+        run_benchmark "$lang" "$cmd" "$RUNS" || true
     fi
 done
 
