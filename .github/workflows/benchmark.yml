@@ -43,7 +43,7 @@ jobs:
         continue-on-error: true
         run: |
           # Install Docker and related tools
-          brew install docker docker-buildx colima lima
+          brew install docker docker-buildx colima lima qemu
 
           # Get patched Lima binary that works without hardware virtualization
           LIMA_PATH=$(brew --prefix)/bin/limactl
@@ -69,7 +69,7 @@ jobs:
         if: steps.lima.outcome != 'success' || steps.lima.outputs.LIMA_SUCCESS != 'true'
         run: |
           # Install necessary language compilers and interpreters
-          brew install go rust julia python gcc node openjdk@17
+          brew install go rust julia python gcc node openjdk@17 zig
 
           # Make sure Java is properly set up
           echo "JAVA_HOME=$(/usr/libexec/java_home -v 17)" >> $GITHUB_ENV
