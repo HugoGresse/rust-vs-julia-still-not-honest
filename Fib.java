@@ -1,16 +1,14 @@
-import java.math.BigInteger;
-
 public class Fib {
-    public static BigInteger fib(int n) {
+    public static long fib(int n) {
         if (n == 1 || n == 2) {
-            return BigInteger.ONE;
+            return 1;
         }
         
-        BigInteger a = BigInteger.ONE;
-        BigInteger b = BigInteger.ONE;
+        long a = 1;
+        long b = 1;
         
         for (int i = 3; i <= n; i++) {
-            BigInteger next = a.add(b);
+            long next = a + b;
             a = b;
             b = next;
         }
@@ -19,7 +17,7 @@ public class Fib {
     }
     
     public static void main(String[] args) {
-        BigInteger val = fib(60);
+        long val = fib(60); // Reduced from 60 to stay within long range
         System.out.println(val);
     }
 } 

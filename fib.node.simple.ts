@@ -1,27 +1,27 @@
-// Fibonacci implementation in TypeScript with BigInt
-// This is a simplified version that doesn't depend on Node.js types
+// Fibonacci implementation in TypeScript with regular numbers
+import * as process from "process";
 
-namespace FibonacciCalculation {
-  // The main fibonacci calculation function
-  export function fibonacci(n: number): bigint {
-    if (n <= 1) return BigInt(n);
+export function fibonacci(n: number): number {
+  if (n <= 1) return n;
 
-    let a: bigint = BigInt(0);
-    let b: bigint = BigInt(1);
+  let a: number = 0;
+  let b: number = 1;
 
-    for (let i = 2; i <= n; i++) {
-      const temp: bigint = a + b;
-      a = b;
-      b = temp;
-    }
-
-    return b;
+  for (let i = 2; i <= n; i++) {
+    const temp: number = a + b;
+    a = b;
+    b = temp;
   }
 
-  // Use a fixed value rather than command line arguments
-  const n: number = 60; // Default to Fibonacci of 60 as in other implementations
+  return b;
+}
 
-  // Calculate and output
-  const result: bigint = fibonacci(n);
-  console.log(result.toString());
+// Execute only if this file is being run directly
+if (require.main === module) {
+  // Get command line argument or use default
+  const n: number = process.argv.length > 2 ? parseInt(process.argv[2]) : 60;
+
+  // Calculate and output result
+  const result: number = fibonacci(n);
+  console.log(result);
 }

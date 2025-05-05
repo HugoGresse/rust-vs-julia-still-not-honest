@@ -1,13 +1,12 @@
-// Simple Fibonacci implementation for Deno
+// Simple Fibonacci implementation for Deno using regular numbers
+function fibonacci(n: number): number {
+  if (n <= 1) return n;
 
-function fibonacci(n) {
-  if (n <= 1) return BigInt(n);
-
-  let a = BigInt(0);
-  let b = BigInt(1);
+  let a: number = 0;
+  let b: number = 1;
 
   for (let i = 2; i <= n; i++) {
-    const temp = a + b;
+    const temp: number = a + b;
     a = b;
     b = temp;
   }
@@ -15,9 +14,6 @@ function fibonacci(n) {
   return b;
 }
 
-// Use a fixed value to avoid parsing arguments
-const n = 60;
-
-// Calculate and output
-const result = fibonacci(n);
-console.log(result.toString());
+// Get command line arguments or use default
+const n: number = Deno.args.length > 0 ? parseInt(Deno.args[0]) : 60;
+console.log(fibonacci(n));

@@ -1,27 +1,38 @@
-// TypeScript type declarations for different runtimes
-declare global {
-  namespace NodeJS {
-    interface Process {
-      argv: string[];
-    }
+#!/usr/bin/env node
+/**
+ * TypeScript Fibonacci implementation
+ * Can be used with Node.js or Deno after transpilation
+ *
+ * Determines which runtime environment is being used and
+ * processes arguments accordingly.
+ */
+
+// Runtime detection utility
+const detectRuntime = (): "node" | "deno" | "browser" | "unknown" => {
+  try {
+    if (typeof Deno !== "undefined") return "deno";
+    if (
+      typeof process !== "undefined" &&
+      process.versions &&
+      process.versions.node
+    )
+      return "node";
+    if (typeof window !== "undefined") return "browser";
+  } catch (e) {
+    /* Ignore errors during detection */
   }
+  return "unknown";
+};
 
-  interface Window {
-    Deno?: {
-      args: string[];
-    };
-  }
-}
+// Fibonacci implementation in TypeScript with regular numbers
+const fibonacci = function (n: number): number {
+  if (n <= 1) return n;
 
-// Fibonacci implementation in TypeScript with BigInt
-const fibonacci = function (n: number): bigint {
-  if (n <= 1) return BigInt(n);
-
-  let a: bigint = BigInt(0);
-  let b: bigint = BigInt(1);
+  let a: number = 0;
+  let b: number = 1;
 
   for (let i = 2; i <= n; i++) {
-    const temp: bigint = a + b;
+    const temp: number = a + b;
     a = b;
     b = temp;
   }
@@ -29,29 +40,35 @@ const fibonacci = function (n: number): bigint {
   return b;
 };
 
-// Determine which JavaScript runtime is being used
-let fibNumber = 60;
+// Main execution
+const main = () => {
+  // Default fibonacci number to calculate
+  let fibNumber = 45; // Reduced from 60 to use regular number
 
-// Use try-catch for runtime detection to avoid errors
-try {
-  // Check for Deno
-  if (typeof Deno !== "undefined") {
-    if (Deno.args && Deno.args.length > 0) {
-      fibNumber = parseInt(Deno.args[0]);
+  // Process arguments based on runtime
+  const runtime = detectRuntime();
+
+  try {
+    if (runtime === "deno") {
+      // @ts-ignore: Deno-specific property
+      const args = Deno.args;
+      if (args && args.length > 0) {
+        fibNumber = parseInt(args[0], 10);
+      }
+    } else if (runtime === "node") {
+      const args = process.argv.slice(2);
+      if (args.length > 0) {
+        fibNumber = parseInt(args[0], 10);
+      }
     }
+  } catch (e) {
+    console.error("Error processing arguments:", e);
   }
-  // Check for Node.js or Bun
-  else if (typeof process !== "undefined" && process.argv) {
-    const args = process.argv.slice(2);
-    if (args.length > 0) {
-      fibNumber = parseInt(args[0]);
-    }
-  }
-} catch (e) {
-  console.error("Warning: Runtime detection issue. Using default value 60.");
-}
 
-const fibResult: bigint = fibonacci(fibNumber);
+  // Calculate and output
+  const fibResult: number = fibonacci(fibNumber);
+  console.log(fibResult);
+};
 
-// Output only the result without any formatting (for benchmark comparison)
-console.log(fibResult.toString());
+// Execute main function
+main();

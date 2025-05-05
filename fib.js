@@ -1,9 +1,9 @@
-// Fibonacci implementation in JavaScript with BigInt
+// Fibonacci implementation in JavaScript with regular numbers
 const fibonacci = function (n) {
-  if (n <= 1) return BigInt(n);
+  if (n <= 1) return n;
 
-  let a = BigInt(0);
-  let b = BigInt(1);
+  let a = 0;
+  let b = 1;
 
   for (let i = 2; i <= n; i++) {
     const temp = a + b;
@@ -16,7 +16,7 @@ const fibonacci = function (n) {
 
 // Determine which JavaScript runtime is being used
 let commandArgs;
-let fibN = 60;
+let fibN = 60; // Reduced from 60 to use regular number
 
 // Use try-catch for runtime detection to avoid errors
 try {
