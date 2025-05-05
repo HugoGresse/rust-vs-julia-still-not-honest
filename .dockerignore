@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+target/
+*.class
+fib_c
+fib_cpp
+fib_go
+fib_fortran
+
+# Results and logs
+benchmark_results.csv
+benchmark_table.md
+
+# Editor files
+.vscode/
+.idea/
+
+# Docker
+Dockerfile
+.dockerignore 

@@ -1,0 +1,98 @@
+name: Fibonacci Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  benchmark-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        run: docker build -t fib-benchmarks .
+
+      - name: Run benchmarks in Docker
+        run: |
+          docker run --name fib-benchmark-container fib-benchmarks
+          docker cp fib-benchmark-container:/app/benchmark_results.csv .
+          docker cp fib-benchmark-container:/app/benchmark_table.md .
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results-linux
+          path: |
+            benchmark_results.csv
+            benchmark_table.md
+
+  benchmark-macos-arm:
+    runs-on: macos-latest-xlarge
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Docker
+        run: |
+          brew install docker
+          colima start --arch aarch64 --memory 4 --cpu 4
+
+      - name: Build Docker image
+        run: |
+          docker build -t fib-benchmarks .
+
+      - name: Run benchmarks in Docker
+        run: |
+          docker run --name fib-benchmark-container fib-benchmarks
+          docker cp fib-benchmark-container:/app/benchmark_results.csv .
+          docker cp fib-benchmark-container:/app/benchmark_table.md .
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results-macos-arm
+          path: |
+            benchmark_results.csv
+            benchmark_table.md
+
+  summarize-results:
+    needs: [benchmark-linux, benchmark-macos-arm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download Linux results
+        uses: actions/download-artifact@v3
+        with:
+          name: benchmark-results-linux
+          path: linux-results
+
+      - name: Download macOS ARM results
+        uses: actions/download-artifact@v3
+        with:
+          name: benchmark-results-macos-arm
+          path: macos-results
+
+      - name: Generate combined report
+        run: |
+          echo "# Benchmark Results" > combined_results.md
+          echo "" >> combined_results.md
+          echo "## Linux Results" >> combined_results.md
+          echo "" >> combined_results.md
+          cat linux-results/benchmark_table.md >> combined_results.md
+          echo "" >> combined_results.md
+          echo "## macOS ARM Results" >> combined_results.md
+          echo "" >> combined_results.md
+          cat macos-results/benchmark_table.md >> combined_results.md
+
+      - name: Upload combined results
+        uses: actions/upload-artifact@v3
+        with:
+          name: combined-benchmark-results
+          path: combined_results.md
