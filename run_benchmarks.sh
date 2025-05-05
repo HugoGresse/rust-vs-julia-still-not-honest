@@ -11,6 +11,15 @@ run_benchmark() {
     runs=${3:-5}  # Default to 5 runs if not specified
     
     echo "Running $name benchmark ($runs runs)..."
+    
+    # Try running once to see if it works
+    test_output=$($command 2>&1 || echo "COMMAND_FAILED")
+    if [[ "$test_output" == *"COMMAND_FAILED"* ]]; then
+        echo "  ⚠️ Skipping $name benchmark - command failed to run"
+        echo "$name,FAILED" >> benchmark_results.csv
+        return
+    fi
+    
     total_time=0
     
     for i in $(seq 1 $runs); do
@@ -37,9 +46,9 @@ run_benchmark() {
 # Create results file with header
 echo "Language,Time(s)" > benchmark_results.csv
 
-# Run each benchmark
+# Run each benchmark with error handling
 run_benchmark "Rust" "./target/release/fib"
-run_benchmark "Julia" "julia fib.jl"
+run_benchmark "Julia" "julia fib.jl" || echo "  ⚠️ Julia benchmark failed - skipping"
 run_benchmark "Python" "python3 fib.py"
 run_benchmark "C" "./fib_c"
 run_benchmark "C++" "./fib_cpp"
@@ -54,12 +63,18 @@ echo "==========================================="
 
 # Check if column command exists, otherwise use a fallback
 if command -v column &> /dev/null; then
-    sort -t, -k2,2 -n benchmark_results.csv | column -t -s,
+    sort -t, -k2,2 -n benchmark_results.csv | grep -v "FAILED" | column -t -s,
 else
     # Fallback to basic formatting if column command is not available
-    sort -t, -k2,2 -n benchmark_results.csv | while IFS=, read -r lang time; do
+    sort -t, -k2,2 -n benchmark_results.csv | grep -v "FAILED" | while IFS=, read -r lang time; do
         printf "%-10s %s\n" "$lang" "$time"
     done
+fi
+
+# List failed benchmarks
+if grep -q "FAILED" benchmark_results.csv; then
+    echo -e "\nThe following benchmarks failed to run:"
+    grep "FAILED" benchmark_results.csv | cut -d, -f1
 fi
 
 # Create markdown table for README
@@ -68,8 +83,17 @@ echo -e "## Benchmark Results\n" > benchmark_table.md
 echo "| Language | Time (seconds) |" >> benchmark_table.md
 echo "| -------- | -------------- |" >> benchmark_table.md
 
-sort -t, -k2,2 -n benchmark_results.csv | tail -n +2 | while IFS=, read -r lang time; do
+sort -t, -k2,2 -n benchmark_results.csv | grep -v "FAILED" | tail -n +2 | while IFS=, read -r lang time; do
     echo "| $lang | $time |" >> benchmark_table.md
 done
+
+if grep -q "FAILED" benchmark_results.csv; then
+    echo -e "\n### Failed Benchmarks\n" >> benchmark_table.md
+    echo "The following benchmarks could not be run in this environment:" >> benchmark_table.md
+    echo "" >> benchmark_table.md
+    grep "FAILED" benchmark_results.csv | cut -d, -f1 | while read -r lang; do
+        echo "- $lang" >> benchmark_table.md
+    done
+fi
 
 echo -e "\nResults saved to benchmark_results.csv and benchmark_table.md" 

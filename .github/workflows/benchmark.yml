@@ -26,7 +26,7 @@ jobs:
           docker cp fib-benchmark-container:/app/benchmark_table.md .
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: benchmark-results-linux
           path: |
@@ -54,7 +54,7 @@ jobs:
           docker cp fib-benchmark-container:/app/benchmark_table.md .
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: benchmark-results-macos-arm
           path: |
@@ -68,13 +68,13 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Download Linux results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: benchmark-results-linux
           path: linux-results
 
       - name: Download macOS ARM results
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: benchmark-results-macos-arm
           path: macos-results
@@ -92,7 +92,7 @@ jobs:
           cat macos-results/benchmark_table.md >> combined_results.md
 
       - name: Upload combined results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: combined-benchmark-results
           path: combined_results.md
