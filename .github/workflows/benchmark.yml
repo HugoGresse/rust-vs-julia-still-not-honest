@@ -38,32 +38,48 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up Colima and Docker
-        run: |
-          brew install colima docker docker-buildx
-          colima start --arch aarch64 --memory 4 --cpu 4
-          mkdir -p ~/.docker/cli-plugins
-          ln -sfn $(brew --prefix)/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          driver-opts: network=host
+          python-version: "3.10"
 
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v1
         with:
-          context: .
-          load: true
-          tags: fib-benchmarks:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          version: "1.9"
 
-      - name: Run benchmarks in Docker
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Set up C/C++ compiler
         run: |
-          docker run --name fib-benchmark-container fib-benchmarks
-          docker cp fib-benchmark-container:/app/benchmark_results.csv .
-          docker cp fib-benchmark-container:/app/benchmark_table.md .
+          brew install gcc
+
+      - name: Set up Fortran
+        run: |
+          brew install gfortran
+
+      - name: Set up Zig
+        run: |
+          brew install zig
+
+      - name: Run benchmarks
+        run: |
+          chmod +x ./run_benchmarks.sh
+          ./run_benchmarks.sh
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
