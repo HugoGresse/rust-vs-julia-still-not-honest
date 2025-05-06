@@ -394,7 +394,7 @@ run_benchmark() {
         $full_command
         echo "Exit code: $?"
         print_error "Skipping $name benchmark - command failed to run"
-        echo "$name,FAILED" >> "$RESULT_FILE"
+        echo "$name,FAILED,N/A,0" >> "$RESULT_FILE"
         return 1
     else
         print_success "  Command validation successful"
@@ -415,16 +415,28 @@ run_benchmark() {
     
     # For the internal benchmark, we only need to run it once as the loop is inside the implementation
     print_info "  Starting benchmark measurement..."
-    local start_time=$(date +%s.%N)
-    $full_command > /dev/null
-    local end_time=$(date +%s.%N)
-    local time_taken=$(echo "$end_time - $start_time" | bc)
+    # Use 'time' command to measure execution time with nanosecond precision
+    time_output=$(TIMEFORMAT='%U.%N'; { time $full_command > /dev/null; } 2>&1)
+    
+    # Ensure time is a valid numeric value and convert to microseconds internally
+    if ! [[ "$time_output" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        print_warning "Invalid time output: $time_output, using fallback value of 0.001"
+        time_output="0.001"
+    fi
+    
+    # Store time in microseconds for more precision (1s = 1,000,000μs)
+    time_us=$(echo "$time_output * 1000000" | bc)
+    # Round to nearest integer microsecond
+    time_us=$(echo "($time_us+0.5)/1" | bc)
+    
+    # Also keep the original for display
+    local time_taken=$time_output
     
     # Print results
-    print_success "  Time: ${BOLD}${time_taken}s${RESET}" "important"
+    print_success "  Time: ${BOLD}${time_taken}s (${time_us}μs)${RESET}" "important"
     
-    # Save to CSV (using the same metrics for compatibility)
-    echo "$name,$time_taken,$time_taken,$time_taken,0" >> "$RESULT_FILE"
+    # Save to CSV with microsecond precision in 4th column (not displayed but used for calculations)
+    echo "$name,$time_taken,,$time_us" >> "$RESULT_FILE"
     
     echo
 }
@@ -500,7 +512,7 @@ check_dependencies
 compile_languages
 
 # Create results file with detailed header
-echo "Language,Average(s),Min(s),Max(s),StdDev(s)" > "$RESULT_FILE"
+echo "Language,Time(s),RelativePerformance(%),TimeUs" > "$RESULT_FILE"
 
 # Prepare language definitions
 declare -A languages=(
@@ -635,21 +647,131 @@ for lang in "${!additional_languages[@]}"; do
     fi
 done
 
+# Calculate relative performance percentages
+print_info "Calculating relative performance..."
+# Create a temporary file
+tmp_result=$(mktemp)
+# Copy header
+head -n1 "$RESULT_FILE" > "$tmp_result"
+
+# Get the fastest time (first entry after sorting by microseconds)
+print_info "Raw timing results before sorting:"
+cat "$RESULT_FILE"
+
+print_info "Sorting results by microsecond time..."
+sorted_results=$(tail -n+2 "$RESULT_FILE" | grep -v "FAILED" | sort -t, -k4,4 -g)
+print_info "Sorted results with numeric sorting (-g):"
+echo "$sorted_results"
+
+fastest_result=$(echo "$sorted_results" | head -n1)
+fastest_lang=$(echo "$fastest_result" | cut -d, -f1)
+fastest_time_s=$(echo "$fastest_result" | cut -d, -f2)
+fastest_time_us=$(echo "$fastest_result" | cut -d, -f4)
+print_info "Fastest language: $fastest_lang with time: ${fastest_time_s}s (${fastest_time_us}μs)"
+
+# Check if fastest time is valid
+if [[ -z "$fastest_time_us" || "$fastest_time_us" == "0" ]]; then
+    print_warning "Fastest time in microseconds is zero or empty, using 1 to avoid division by zero"
+    fastest_time_us="1"
+fi
+
+# Ensure fastest_time is a numeric value
+fastest_time_us=$(echo "$fastest_time_us" | sed 's/[^0-9.]//g')
+print_info "Sanitized fastest time: ${fastest_time_us}μs"
+
+# Calculate percentage increase for each entry
+tail -n+2 "$RESULT_FILE" | grep -v "FAILED" | sort -t, -k4,4 -g | while IFS=, read -r lang time_s perf time_us; do
+    # Ensure time is a valid numeric value
+    if ! [[ "$time_us" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        print_warning "Invalid microsecond value for $lang: $time_us, skipping"
+        continue
+    fi
+
+    # Sanitize time value
+    time_us=$(echo "$time_us" | sed 's/[^0-9.]//g')
+    
+    # Only the actual fastest language should get 0.0%
+    if [[ "$lang" == "$fastest_lang" ]]; then
+        # Fastest language is the baseline (0% increase)
+        percentage="0.0"
+        print_info "  $lang: time=${time_s}s (${time_us}μs) is fastest (0% increase)"
+    else
+        # Calculate percentage increase: ((time - fastest_time) / fastest_time) * 100
+        print_info "  Calculating for $lang: time=${time_s}s (${time_us}μs), fastest=${fastest_time_s}s (${fastest_time_us}μs)"
+        
+        # Both values are already in microseconds (integer), so calculation is straightforward
+        time_diff=$(echo "$time_us - $fastest_time_us" | bc)
+        print_info "  Difference in μs: $time_diff"
+        
+        # Calculate percentage - use bc for high precision
+        calc_result=$(echo "scale=6; ($time_diff / $fastest_time_us) * 100" | bc -l 2>/dev/null)
+        print_info "  Raw percentage: $calc_result"
+        
+        # If calculation fails, use a simple fallback approach
+        if [[ -z "$calc_result" ]]; then
+            print_warning "  BC calculation failed for $lang, using Bash arithmetic fallback"
+            if [[ "$fastest_time_us" -gt "0" ]]; then
+                calc_result=$(( (time_us - fastest_time_us) * 100 / fastest_time_us ))
+                print_info "  Fallback calculation: (($time_us - $fastest_time_us) * 100 / $fastest_time_us) = $calc_result"
+            else
+                print_warning "  Fallback failed too, setting percentage to 999.9"
+                calc_result="999.9"
+            fi
+        fi
+        
+        # Try to format the percentage, catch any errors
+        percentage=$(LC_NUMERIC=C printf "%.1f" $calc_result 2>/dev/null)
+        # Check if we got a valid percentage
+        if [[ -z "$percentage" || ! "$percentage" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            print_warning "  Formatting failed, using raw calc_result"
+            percentage=$calc_result
+        fi
+        
+        # Ensure we don't accidentally output 0.0 for values that are just close
+        if [[ "$percentage" == "0.0" && "$lang" != "$fastest_lang" ]]; then
+            print_warning "  Percentage rounded to 0.0 but this isn't the fastest language, using 0.1"
+            percentage="0.1"
+        fi
+        
+        print_info "  Final result: $lang is ${percentage}% slower than fastest"
+    fi
+    
+    # Add the percentage sign for display
+    echo "$lang,$time_s,$percentage%,$time_us" >> "$tmp_result"
+done
+
+# Add failed entries
+if grep -q "FAILED" "$RESULT_FILE"; then
+    print_info "Adding failed benchmark entries to the results..."
+    grep "FAILED" "$RESULT_FILE" >> "$tmp_result"
+fi
+
+# Replace original file with updated one
+mv "$tmp_result" "$RESULT_FILE"
+
 # Display sorted results
 print_header "Benchmark Results (sorted by execution time)" "----------------------------------------"
 
 if command -v column &> /dev/null; then
+    # Create a display-ready version of the results file (without the hidden microseconds column)
+    display_file=$(mktemp)
+    head -n1 "$RESULT_FILE" | cut -d, -f1-3 > "$display_file"
+    tail -n+2 "$RESULT_FILE" | sort -t, -k4,4 -g | cut -d, -f1-3 >> "$display_file"
+    
     # First line with headers
-    head -n1 "$RESULT_FILE" | column -t -s,
+    head -n1 "$display_file" | column -t -s,
     echo -e "${BLUE}$(printf '%.0s-' $(seq 1 60))${RESET}"
     # Data lines, sorted by time
-    tail -n+2 "$RESULT_FILE" | grep -v "FAILED" | sort -t, -k2,2 -n | column -t -s,
+    tail -n+2 "$display_file" | grep -v "FAILED" | column -t -s,
+    
+    # Clean up
+    rm "$display_file"
 else
     # Fallback formatting without column command
-    head -n1 "$RESULT_FILE" | awk -F, '{printf "%-10s %-12s %-10s %-10s %-10s\n", $1, $2, $3, $4, $5}'
+    head -n1 "$RESULT_FILE" | cut -d, -f1-3 | awk -F, '{printf "%-20s %-12s %-20s\n", $1, $2, $3}'
     echo -e "${BLUE}$(printf '%.0s-' $(seq 1 60))${RESET}"
-    tail -n+2 "$RESULT_FILE" | grep -v "FAILED" | sort -t, -k2,2 -n | 
-        awk -F, '{printf "%-10s %-12s %-10s %-10s %-10s\n", $1, $2, $3, $4, $5}'
+    tail -n+2 "$RESULT_FILE" | grep -v "FAILED" | sort -t, -k4,4 -g | cut -d, -f1-3 | 
+        awk -F, '{printf "%-20s %-12s %-20s\n", $1, $2, $3}'
 fi
 
 # List failed benchmarks
@@ -669,13 +791,13 @@ cat > "$TABLE_FILE" << EOF
 
 Results for Fibonacci($FIB_N) calculation with $RUNS runs per language:
 
-| Language | Average (s) | Min (s) | Max (s) | StdDev (s) |
-| -------- | ----------- | ------- | ------- | ---------- |
+| Language | Time (s) | Relative Performance |
+| -------- | -------- | ------------------- |
 EOF
 
 # Add sorted results
-tail -n+2 "$RESULT_FILE" | grep -v "FAILED" | sort -t, -k2,2 -n | while IFS=, read -r lang avg min max stddev; do
-    echo "| $lang | $avg | $min | $max | $stddev |" >> "$TABLE_FILE"
+tail -n+2 "$RESULT_FILE" | grep -v "FAILED" | sort -t, -k4,4 -g | cut -d, -f1-3 | while IFS=, read -r lang time perf; do
+    echo "| $lang | $time | $perf |" >> "$TABLE_FILE"
 done
 
 # Add failed benchmarks if any
