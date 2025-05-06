@@ -149,6 +149,10 @@ check_dependencies() {
         check_command javac "Java benchmarks will be skipped"
     fi
     
+    if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"csharp"* || "$SELECTED_LANGS" == *"c#"* ]]; then
+        check_command dotnet "C# benchmarks will be skipped"
+    fi
+    
     if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"javascript"* || "$SELECTED_LANGS" == *"js"* ]]; then
         check_command node "Node.js benchmarks will be skipped"
         check_command bun "Bun benchmarks will be skipped"
@@ -249,6 +253,29 @@ compile_languages() {
         fi
     fi
     
+    # Compile C#
+    if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"csharp"* || "$SELECTED_LANGS" == *"c#"* ]]; then
+        if check_command dotnet &>/dev/null; then
+            print_info "Compiling C# implementation..."
+            # Detect architecture
+            ARCH=$(uname -m)
+            print_info "  Detected architecture: $ARCH"
+            
+            # Set appropriate RuntimeIdentifier
+            if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+                RID="linux-arm64"
+            elif [[ "$ARCH" == "x86_64" ]]; then
+                RID="linux-x64"
+            else
+                RID="linux-$ARCH"
+            fi
+            print_info "  Using .NET RuntimeIdentifier: $RID"
+            
+            # Build for release and publish as a self-contained app
+            dotnet publish -c Release -r $RID --self-contained true -o ./bin/csharp 2>/dev/null || print_warning "Failed to compile C# project"
+        fi
+    fi
+    
     echo
 }
 
@@ -269,10 +296,24 @@ validate_languages() {
         print_info "  Validating $lang..."
         
         cmd=${languages[$lang]}
-        result=$($cmd 2>/dev/null || echo "FAILED")
+        print_info "    Command: $cmd"
         
-        if [[ "$result" == "FAILED" ]]; then
-            print_warning "    Failed to run $lang implementation"
+        # Enhanced logging for C# specifically
+        if [[ "$lang" == "C#" ]]; then
+            print_info "    Checking C# executable:"
+            ls -la $(echo "$cmd" | awk '{print $1}') || print_warning "C# executable not found"
+            print_info "    Checking if file is executable..."
+            test -x $(echo "$cmd" | awk '{print $1}') && print_success "File is executable" || print_warning "File is NOT executable"
+            print_info "    File type info:"
+            file $(echo "$cmd" | awk '{print $1}') || print_warning "Could not determine file type"
+        fi
+        
+        print_info "    Executing: $cmd"
+        result=$($cmd 2>&1 || echo "FAILED:$?")
+        
+        if [[ "$result" == FAILED* ]]; then
+            exit_code=$(echo "$result" | cut -d':' -f2)
+            print_warning "    Failed to run $lang implementation (exit code: $exit_code)"
         elif [[ "$result" != "$EXPECTED_RESULT" ]]; then
             print_warning "    $lang returned incorrect result: '$result' (expected: '$EXPECTED_RESULT')"
         else
@@ -309,14 +350,54 @@ run_benchmark() {
     # The pattern is: command n runs
     local full_command="$command $FIB_N $runs"
     
+    print_info "  Command to execute: '$full_command'"
+    
+    # Special debug for C#
+    if [[ "$name" == "C#" ]]; then
+        print_info "  Checking C# executable before benchmark run:"
+        
+        # Check if binary exists and is executable
+        bin_path=$(echo "$command" | awk '{print $1}')
+        print_info "  Binary path: $bin_path"
+        
+        if [[ -f "$bin_path" ]]; then
+            print_success "  C# binary exists"
+            ls -la "$bin_path"
+        else
+            print_error "  C# binary not found at '$bin_path'"
+            ls -la "$(dirname "$bin_path")" || echo "Cannot list directory"
+            return 1
+        fi
+        
+        # Check permissions
+        if [[ -x "$bin_path" ]]; then
+            print_success "  C# binary is executable"
+        else
+            print_warning "  C# binary is not executable, fixing permissions"
+            chmod +x "$bin_path"
+        fi
+        
+        # Show binary info
+        print_info "  Binary type information:"
+        file "$bin_path" || echo "Failed to get file info"
+    fi
+    
     # Validate command can run
+    print_info "  Validating command execution..."
     if ! $full_command &>/dev/null; then
+        print_error "  Validation failed - command execution error"
+        print_info "  Attempting to run with debug output:"
+        $full_command
+        echo "Exit code: $?"
         print_error "Skipping $name benchmark - command failed to run"
         echo "$name,FAILED" >> "$RESULT_FILE"
         return 1
+    else
+        print_success "  Command validation successful"
     fi
     
     # Test the output once to ensure it matches expected result
+    print_info "  Testing output validity..."
     local valid_output=$(mktemp)
     $command $FIB_N 1 > "$valid_output"
     local result=$(cat "$valid_output")
@@ -324,9 +405,12 @@ run_benchmark() {
     
     if [[ "$result" != "$EXPECTED_RESULT" ]]; then
         print_warning "  Output '$result' does not match expected '$EXPECTED_RESULT'"
+    else
+        print_success "  Output verified: '$result' matches expected result"
     fi
     
     # For the internal benchmark, we only need to run it once as the loop is inside the implementation
+    print_info "  Starting benchmark measurement..."
     local start_time=$(date +%s.%N)
     $full_command > /dev/null
     local end_time=$(date +%s.%N)
@@ -427,13 +511,27 @@ declare -A languages=(
     ["Zig"]="./fib"
 )
 
+# Add C# with fallback paths - try multiple locations in order
+if [[ -x "./bin/csharp/Fib" ]]; then
+    languages["C#"]="./bin/csharp/Fib"
+elif [[ -x "./bin/Release/Fib" ]]; then
+    languages["C#"]="./bin/Release/Fib"
+elif [[ -x "./bin/Release/net7.0/linux-x64/Fib" ]]; then
+    languages["C#"]="./bin/Release/net7.0/linux-x64/Fib"
+elif [[ -f "./bin/csharp/Fib.dll" ]]; then
+    languages["C#"]="dotnet ./bin/csharp/Fib.dll"
+elif [[ -f "./bin/Release/net7.0/Fib.dll" ]]; then
+    languages["C#"]="dotnet ./bin/Release/net7.0/Fib.dll"
+else
+    print_warning "Unable to find C# executable - it will be skipped"
+fi
+
 # Define additional languages that might be available
 declare -A additional_languages=(
     ["WebAssembly"]="node fib.wasm.js"
     ["JavaScript-Node"]="node fib.node.js"
     ["JavaScript-Bun"]="bun fib.js"
     ["JavaScript-Deno"]="deno run --allow-read fib.js.deno"
-    ["TypeScript-Node"]="ts-node fib.node.ts"
     ["TypeScript-Node-Compiled"]="node fib.node_alt.js"
     ["TypeScript-Bun"]="bun fib.ts"
     ["TypeScript-Deno"]="deno run --allow-read fib.ts.deno"

@@ -46,6 +46,15 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN curl -fsSL https://install.julialang.org | sh -s -- -y
 ENV PATH="/root/.juliaup/bin:${PATH}"
 
+# Install .NET SDK for C#
+RUN wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    rm packages-microsoft-prod.deb && \
+    apt-get update && \
+    apt-get install -y dotnet-sdk-7.0 && \
+    dotnet --list-sdks && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install Zig - fixed installation
 RUN mkdir -p /opt/zig && \
     wget -O /tmp/zig.tar.xz https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz && \
@@ -136,7 +145,35 @@ RUN gcc -Ofast -o fib_c fib.c && \
     javac Fib.java && \
     zig build-exe -O ReleaseFast fib.zig && \
     cargo build --release && \
-    chmod +x fib.php fib.pl
+    chmod +x fib.php fib.pl && \
+    # Build the C# project with detailed output for debugging
+    echo "=== C# BUILD START ===" && \
+    dotnet --info && \
+    echo "=== RESTORING PACKAGES ===" && \
+    dotnet restore && \
+    echo "=== PUBLISHING C# APP ===" && \
+    ARCH=$(uname -m) && \
+    echo "Detected architecture: $ARCH" && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+      export RID="linux-arm64"; \
+    elif [ "$ARCH" = "x86_64" ]; then \
+      export RID="linux-x64"; \
+    else \
+      export RID="linux-$ARCH"; \
+    fi && \
+    echo "Using .NET RuntimeIdentifier: $RID" && \
+    dotnet publish -c Release -r $RID --self-contained true -o ./bin/csharp && \
+    echo "=== C# BUILD OUTPUT ===" && \
+    ls -la ./bin/csharp && \
+    echo "=== C# BINARY INFO ===" && \
+    file ./bin/csharp/Fib 2>/dev/null || { echo "Fib executable not found, looking for alternatives:"; find ./bin -name "Fib*" -type f; } && \
+    chmod -R 755 ./bin/csharp && \
+    # Ensure the binary is executable even outside csharp dir
+    find ./bin -name "Fib" -type f -exec chmod +x {} \; && \
+    # Symlink to ensure any alternate location is found 
+    [ -f ./bin/Release/net7.0/linux-x64/Fib ] && ln -sf ./bin/Release/net7.0/linux-x64/Fib ./bin/csharp/Fib || true && \
+    echo "=== TESTING C# EXECUTABLE ===" && \
+    ./bin/csharp/Fib 30 1 || { echo "C# executable test failed with exit code $?"; ls -la ./bin/csharp; }
 
 # Create an entrypoint that runs the benchmarks
 ENTRYPOINT ["/app/run_benchmarks.sh"] 

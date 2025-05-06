@@ -28,4 +28,4 @@ for ($i = 0; $i < $runs; $i++) {
 
 // Output result
 echo $result;
-?> 
+?>
