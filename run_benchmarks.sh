@@ -11,7 +11,7 @@ DEFAULT_N=60
 EXPECTED_RESULT="1548008755920"
 RESULT_FILE="benchmark_results.csv"
 TABLE_FILE="benchmark_table.md"
-VERBOSE=true
+VERBOSE=false
 SHOW_PROGRESS=true
 USE_COLOR=true
 USE_DOCKER=true  # Default to using Docker
@@ -44,11 +44,15 @@ print_header() {
 }
 
 print_info() {
-    echo -e "${BLUE}➤ $1${RESET}"
+    if [[ "$VERBOSE" == "true" || "$2" == "important" ]]; then
+        echo -e "${BLUE}➤ $1${RESET}"
+    fi
 }
 
 print_success() {
-    echo -e "${GREEN}✓ $1${RESET}"
+    if [[ "$VERBOSE" == "true" || "$2" == "important" ]]; then
+        echo -e "${GREEN}✓ $1${RESET}"
+    fi
 }
 
 print_warning() {
@@ -108,7 +112,7 @@ check_library() {
 }
 
 check_dependencies() {
-    print_info "Checking dependencies..."
+    print_info "Checking dependencies..." "important"
     
     # Check for essential commands
     check_command bc "benchmark calculations will fail" || exit 1
@@ -182,7 +186,7 @@ check_dependencies() {
 }
 
 compile_languages() {
-    print_info "Compiling language implementations..."
+    print_info "Compiling language implementations..." "important"
     
     # Compile C
     if [[ -z "$SELECTED_LANGS" || "$SELECTED_LANGS" == *"c"* ]]; then
@@ -281,7 +285,7 @@ compile_languages() {
 
 # Validate language implementations return correct result
 validate_languages() {
-    print_info "Validating language implementations..."
+    print_info "Validating language implementations..." "important"
     
     local validated_languages=()
     
@@ -332,7 +336,7 @@ validate_languages() {
     if [[ "${#languages[@]}" -eq 0 ]]; then
         print_warning "No language implementations were successfully validated. Check that implementations are correct."
     else
-        print_success "Successfully validated ${#languages[@]} language implementations."
+        print_success "Successfully validated ${#languages[@]} language implementations." "important"
     fi
     
     echo
@@ -344,7 +348,7 @@ run_benchmark() {
     local command=$2
     local runs=${3:-$DEFAULT_RUNS}
     
-    print_info "Running $name benchmark ($runs runs)..."
+    print_info "Running $name benchmark ($runs runs)..." "important"
     
     # Add parameters for n and runs to the command
     # The pattern is: command n runs
@@ -417,7 +421,7 @@ run_benchmark() {
     local time_taken=$(echo "$end_time - $start_time" | bc)
     
     # Print results
-    print_success "  Time: ${BOLD}${time_taken}s${RESET}"
+    print_success "  Time: ${BOLD}${time_taken}s${RESET}" "important"
     
     # Save to CSV (using the same metrics for compatibility)
     echo "$name,$time_taken,$time_taken,$time_taken,0" >> "$RESULT_FILE"
